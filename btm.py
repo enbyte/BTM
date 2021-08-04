@@ -1,4 +1,5 @@
 import pygame
+from pygame.locals import *
 import copy
 import logging
 
@@ -38,6 +39,17 @@ class Tile:
             self.name = name
             _tile_registry.append(name)
 
+class NullTile:
+    '''
+    Class to represent a blank tile with no image and no rect.
+    '''
+    def __init__(self):
+        self.name = ''
+    
+class _NullTile:
+    def draw(self, *pargs, **kwargs):
+        pass
+
         
 
 class _Tile:
@@ -45,7 +57,7 @@ class _Tile:
     Internal class used to represent a specific tile in the world.
     '''
     def __init__(self, tiletype, x, y):
-        assert type(tiletype) == Tile
+        assert type(tiletype) == Tile or type(tiletype) == NullTile
         self.name = tiletype.name
         self.id = tiletype.name #redundancy, used in some Player collisions code
         self.image = tiletype.image
@@ -60,6 +72,7 @@ class _Tile:
     def get_rect(self):
         return self.rect
 
+
 class Tilemap:
     def __init__(self, matrix, tile_list, TILE_SIZE=32):
         self.matrix = matrix
@@ -67,7 +80,10 @@ class Tilemap:
         x, y = 0, 0
         for row in self.tile_matrix:
             for thing in row:
-                self.tile_matrix[y][x] = _Tile(self.tile_list[thing], TILE_SIZE * x, TILE_SIZE * y)   
+                if not type(tile_list[thing]) == NullTile:
+                    self.tile_matrix[y][x] = _Tile(tile_list[thing], TILE_SIZE * x, TILE_SIZE * y) 
+                else:
+                    self.tile_matrix[y][x] = _NullTile() 
                 x += 1
             x = 0
             y += 1
@@ -82,7 +98,8 @@ class Tilemap:
         x, y = 0, 0
         for row in self.tile_matrix:
             for tile in row:
-                tile.draw(surface)
+                if not type(tile) == _NullTile:
+                    tile.draw(surface)
 
     def get_list_of_tiles(self):
         '''
@@ -127,14 +144,15 @@ class Tilemap:
         y_difference = y - self.y
         self.move_xy(x_difference, y_difference)
 
-    def collision_test(self, rect, ignore=[]):
+    def collision_test(self, rect, ignore_tiletypes=[], ignore_names=[]):
         '''
         For each tile in the tilemap, test if it collides with a given pygame.Rect.
         '''
         hit_list = [] # we gonna murder these tiles
         for x in self.get_list_of_tiles():
-            if x.colliderect(rect):
-                hit_list.append(x)
+            if not type(x) == _NullTile:
+                if x.rect.colliderect(rect) and not x.tiletype in ignore_tiletypes and not x.name in ignore_names: # tile x collides with given rect and isn't in the ignore
+                    hit_list.append(x.rect)
 
         return hit_list
 
@@ -142,7 +160,7 @@ class Tilemap:
 
 class Player:
     def __init__(self, image, x, y):
-        self.image = image if type(image) == pygame.Surface else pygame.image.load(image)
+        self.image = _sticky_load_image(image)
         self.x, self.y = x, y
         self.rect = self.image.get_rect()
         self.rect.x = x
@@ -150,12 +168,11 @@ class Player:
         self.xvel = 0
         self.yvel = 0
 
-    def move(self, tilemap, ignore=[]):
+    def move(self, tilemap, ignore_tiletypes=[], ignore_names=[]):
         collision_types = {'top': False, 'bottom': False, 'right': False, 'left': False}
         self.rect.x += self.xvel
-        hit_list = tilemap.collision_test(self.rect, ignore=ignore)
+        hit_list = tilemap.collision_test(self.rect, ignore_tiletypes=ignore_tiletypes, ignore_names=ignore_names)
         for tile in hit_list:
-            #if not tile
             if self.xvel > 0:
                 self.rect.right = tile.left
                 collision_types['right'] = True
@@ -173,8 +190,84 @@ class Player:
                 collision_types['top'] = True
         return collision_types
 
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
+
 if __name__ ==  '__main__':
-    class A: pass
-    x=A()
-    _sticky_load_image(x)
+    screen = pygame.display.set_mode((19 * 16, 13 * 16), flags=pygame.SCALED)
+    running = True
+    
+    game_map = [['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
+            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
+            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
+            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
+            ['0','0','0','0','0','0','0','2','2','2','2','2','0','0','0','0','0','0','0'],
+            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
+            ['2','2','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','2','2'],
+            ['1','1','2','2','2','2','2','2','2','2','2','2','2','2','2','2','2','1','1'],
+            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
+            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
+            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
+            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
+            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1']]
+    dirt = Tile('dirt.png', name="Dirt")
+    grass = Tile('grass.png', name="Grass")
+    air = NullTile()
+    tmap = Tilemap(game_map, {'0': air, '1': dirt, '2': grass}, TILE_SIZE=16)
+    p = Player('player.png', 10, 10)
+    p.image.set_colorkey((255, 255, 255)) # remove white background
+    air_timer = 0
+    moving_right, moving_left = False, False
+    print("Starting mainloop")
+    while running:
+        screen.fill((146, 244, 255))
+        tmap.draw(screen)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            if event.type == KEYDOWN:
+
+                if event.key == K_RIGHT:
+                    moving_right = True
+
+                if event.key == K_LEFT:
+                    moving_left = True
+
+                if event.key == K_UP:
+                    if air_timer < 6:
+                        p.yvel = -5
+                        print("Jump")
+
+            if event.type == KEYUP:
+                if event.key == K_RIGHT:
+                    moving_right = False
+
+                if event.key == K_LEFT:
+                    moving_left = False
+
+        xmovement = 0
+        if moving_left:
+            xmovement -= 2
+        if moving_right:
+            xmovement += 2
+
+        p.xvel = xmovement
+
+
+        p.yvel += 0.2
         
+        collisions = p.move(tmap)
+
+        if collisions['bottom']:
+            p.yvel = 0
+            air_timer = 0
+        else:
+            air_timer += 1
+
+        if collisions['top']:
+            p.yvel = 0
+
+        p.draw(screen)
+
+        pygame.display.update()
