@@ -3,7 +3,7 @@ from pygame.locals import *
 import copy
 import logging
 
-logging.basicConfig(format='%(levelname)s @ %(asctime)s: %(message)s') # setup logging as example 'WARNING @ 1:32: Bing bong
+logging.basicConfig(format='%(levelname)s @ %(asctime)s: %(message)s') # setup logging as 'WARNING @ 1:32: Bing bong'
 
 pygame.init()
 
@@ -118,7 +118,8 @@ class Tilemap:
         self.x += amount
         for row in self.tile_matrix:
             for tile in row:
-                tile.rect.x += amount #move each tile's x by a the given amount
+                if not type(tile) == _NullTile:
+                    tile.rect.x += amount #move each tile's x by a the given amount
 
     def move_y(self, amount):
         '''
@@ -127,7 +128,8 @@ class Tilemap:
         self.y += amount
         for row in self.tile_matrix:
             for tile in row:
-                tile.rect.y += amount
+                if not type(tile) == _NullTile:
+                    tile.rect.y += amount
 
     def move_xy(self, xamount, yamount):
         '''
@@ -151,9 +153,11 @@ class Tilemap:
         hit_list = [] # we gonna murder these tiles
         for x in self.get_list_of_tiles():
             if not type(x) == _NullTile:
-                if x.rect.colliderect(rect) and not x.tiletype in ignore_tiletypes and not x.name in ignore_names: # tile x collides with given rect and isn't in the ignore
-                    hit_list.append(x.rect)
-
+                if x.rect.colliderect(rect):
+                    if x.tiletype in ignore_tiletypes: continue
+                    if x.name in ignore_names: continue
+                    hit_list.append(x)
+        hit_list = [x for x in hit_list if x.name not in ignore_names and x.tiletype not in ignore_tiletypes]
         return hit_list
 
 
@@ -172,7 +176,8 @@ class Player:
         collision_types = {'top': False, 'bottom': False, 'right': False, 'left': False}
         self.rect.x += self.xvel
         hit_list = tilemap.collision_test(self.rect, ignore_tiletypes=ignore_tiletypes, ignore_names=ignore_names)
-        for tile in hit_list:
+        for t in hit_list:
+            tile = t.rect
             if self.xvel > 0:
                 self.rect.right = tile.left
                 collision_types['right'] = True
@@ -180,8 +185,9 @@ class Player:
                 self.rect.left = tile.right
                 collision_types['left'] = True
         self.rect.y += self.yvel
-        hit_list = tilemap.collision_test(self.rect) #recheck after moving along x-axis
-        for tile in hit_list:
+        hit_list = tilemap.collision_test(self.rect, ignore_tiletypes=ignore_tiletypes, ignore_names=ignore_names) #recheck after moving along x-axis
+        for t in hit_list:
+            tile = t.rect
             if self.yvel > 0:
                 self.rect.bottom = tile.top
                 collision_types['bottom'] = True
@@ -194,9 +200,11 @@ class Player:
         surface.blit(self.image, self.rect)
 
 if __name__ ==  '__main__':
-    screen = pygame.display.set_mode((19 * 16, 13 * 16), flags=pygame.SCALED)
+    screen = pygame.display.set_mode((19 * 16, 13 * 16))
     running = True
     
+    clock = pygame.time.Clock()
+
     game_map = [['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
             ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
             ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
@@ -239,6 +247,9 @@ if __name__ ==  '__main__':
                         p.yvel = -5
                         print("Jump")
 
+                if event.key == K_SPACE:
+                    tmap.move_x(5)
+
             if event.type == KEYUP:
                 if event.key == K_RIGHT:
                     moving_right = False
@@ -271,3 +282,5 @@ if __name__ ==  '__main__':
         p.draw(screen)
 
         pygame.display.update()
+
+        clock.tick(60)
