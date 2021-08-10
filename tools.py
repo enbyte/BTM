@@ -56,7 +56,7 @@ def subsection(matrix, firstrow, lastrow, firstcolumn, lastcolumn, includeLast=T
     t = [x[firstrow:lastrow+inc] for x in matrix[firstcolumn:lastcolumn+inc]]
     return t
 
-def longestItemInList(list_):
+def longest_item_in_list(list_):
     top = list_[0] - 1
     for item in list_:
         if len(item) > top:
