@@ -121,7 +121,7 @@ if __name__ == '__main__': #self-test code
             print("M2:")
             pprint(mat)
         else:
-            print("Test complete")
+            print("Test complete, passed")
         
 
 
