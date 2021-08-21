@@ -174,7 +174,7 @@ class Tilemap:
         hit_list = [x for x in hit_list if x.name not in ignore_names and x.tiletype not in ignore_tiletypes]
         return hit_list
 
-    def get_tile(self, x, y):
+    def get_tile_at(self, x, y):
         '''
         Return the tile at x, y in worldspace
         '''
@@ -187,6 +187,31 @@ class Tilemap:
         print("Matrix size:", len(self.tile_matrix), len(self.tile_matrix[0]))
         z = self.tile_matrix[ytile]
         return z[xtile]
+
+    def get_names(self):
+        return [x.name for x in self.tile_list]
+
+    def get_tile(self, name):
+        for x in self.tile_list:
+            if x.name == name:
+                return x
+
+    def get_matrix(self):
+        '''
+        Get the non-tile matrix, with the numbers or whatever.
+        '''
+        z = tools.matrix(0, len(self.tile_matrix[0]),  len(self.tile_matrix))
+        x, y = 0, 0
+        for i in z:
+            for p in i:
+                print('y, x:', y, x)
+                t = self.get_tile(self.tile_matrix[y][x].name)
+                z[y][x] = self.tile_list.index(t)
+                x += 1
+            x = 0
+            y += 1
+
+        return z
 
 
 
@@ -239,7 +264,7 @@ class Player:
 
 if __name__ ==  '__main__':
     screen = pygame.Surface((19 * 16, 13 * 16))
-    DISPLAY = pygame.display.set_mode((19 * 16, 13 * 16), flags=pygame.SCALED)
+    DISPLAY = pygame.display.set_mode((19 * 16, 13 * 16))
     running = True
     TILE_SIZE = 16
     clock = pygame.time.Clock()
@@ -251,9 +276,12 @@ if __name__ ==  '__main__':
     p = Player('player.png', 10, 10)
     p.image.set_colorkey((255, 255, 255)) # remove white background
     air_timer = 0
+    tot_fps = 0
+    num_frames = 1
     to_draw = grass
     moving_right, moving_left = False, False
     print("Starting mainloop")
+    font = pygame.font.Font(None, 24)
     while running:
         screen.fill((146, 244, 255))
         tmap.draw(screen)
@@ -282,6 +310,12 @@ if __name__ ==  '__main__':
                 
                 if event.key == K_1:
                     to_draw = grass
+
+                if event.key == K_2:
+                    to_draw = dirt
+
+                if event.key == K_s:
+                    tools.save(tmap.get_matrix(), input("Filename: "))
 
             if event.type == KEYUP:
                 if event.key == K_RIGHT:
@@ -317,7 +351,15 @@ if __name__ ==  '__main__':
 
         p.draw(screen)
         DISPLAY.blit(screen, (0, 0))
+        tot_fps += round(clock.get_fps())
+        avg = round(tot_fps / num_frames)
+        num_frames += 1
+        if num_frames > 10**10: #reset every million frames
+            num_frames = 1
+            tot_fps = 0
+        fps = "Average FPS: " + str(avg)
+        DISPLAY.blit(font.render(fps, True, (0, 0, 0)), (0, 0))
 
         pygame.display.update()
 
-        clock.tick(60)
+        clock.tick()
